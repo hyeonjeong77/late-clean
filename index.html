@@ -1,38 +1,251 @@
 <!DOCTYPE html>
-<html>
+<!DOCTYPE html>
+<html lang="ko">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="category_ui">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>category_ui</title>
-  <link rel="manifest" href="manifest.json">
+	<meta charset="UTF-8">
+	<title>벌금 정산 프로그램</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Arial, sans-serif;
+			background: #f7f9fb;
+			margin: 0;
+			padding: 0;
+		}
+		.container {
+			max-width: 500px;
+			margin: 40px auto;
+			background: #fff;
+			border-radius: 16px;
+			box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+			padding: 32px 28px 24px 28px;
+		}
+		h2 {
+			text-align: center;
+			color: #2d3a4b;
+			margin-bottom: 18px;
+		}
+		.date-row {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			gap: 10px;
+			margin-bottom: 18px;
+		}
+		input[type="date"] {
+			padding: 6px 10px;
+			border-radius: 6px;
+			border: 1px solid #bfc9d1;
+			font-size: 1rem;
+		}
+		table {
+			width: 100%;
+			border-collapse: collapse;
+			margin-bottom: 18px;
+		}
+		th, td {
+			border: 1px solid #e3e7ed;
+			padding: 8px 0;
+			text-align: center;
+		}
+		th {
+			background: #f0f4f8;
+			color: #3a4a5d;
+		}
+		tr:nth-child(even) td {
+			background: #f9fbfd;
+		}
+		.btn {
+			display: block;
+			width: 100%;
+			background: #4f8cff;
+			color: #fff;
+			border: none;
+			border-radius: 8px;
+			padding: 12px 0;
+			font-size: 1.1rem;
+			font-weight: bold;
+			cursor: pointer;
+			margin-top: 8px;
+			transition: background 0.2s;
+		}
+		.btn:hover {
+			background: #2563d6;
+		}
+		.result {
+			margin-top: 18px;
+			background: #f0f6ff;
+			border-radius: 8px;
+			padding: 14px 18px;
+			color: #1a2a3a;
+			font-size: 1.05rem;
+		}
+		.date-label {
+			font-weight: bold;
+			color: #2d3a4b;
+		}
+	</style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+	<div class="container">
+		<h2>벌금 정산 프로그램</h2>
+		<div class="date-row">
+			<label class="date-label">날짜:</label>
+			<input type="date" id="mainDate">
+		</div>
+		<form id="fineForm">
+			<table>
+				<thead>
+					<tr>
+						<th>이름</th>
+						<th>청소 안함<br>(5,000원)</th>
+						<th>지각<br>(1,000원)</th>
+					</tr>
+				</thead>
+				<tbody id="peopleTable">
+					<tr>
+						<td><input type="text" name="name" value="홍길동"></td>
+						<td><input type="checkbox" name="cleaning"></td>
+						<td><input type="checkbox" name="late"></td>
+					</tr>
+					<tr>
+						<td><input type="text" name="name" value="김철수"></td>
+						<td><input type="checkbox" name="cleaning"></td>
+						<td><input type="checkbox" name="late"></td>
+					</tr>
+					<tr>
+						<td><input type="text" name="name" value="이영희"></td>
+						<td><input type="checkbox" name="cleaning"></td>
+						<td><input type="checkbox" name="late"></td>
+					</tr>
+				</tbody>
+			</table>
+			<div style="margin: 18px 0 0 0; padding: 10px 0; border-top: 1px solid #e3e7ed;">
+				<label class="date-label">기간:</label>
+				<input type="date" id="dateStart"> ~ <input type="date" id="dateEnd">
+			</div>
+			<button type="button" class="btn" onclick="calculateFine()">정산하기</button>
+		</form>
+		<div class="result" id="result"></div>
+	</div>
+	<script>
+	// 날짜별 체크 상태 저장용 객체
+	const dateCheckState = {};
+
+	// 체크란 날짜 변경 시 체크박스 상태 관리
+	document.getElementById('mainDate').addEventListener('change', function() {
+		const date = this.value;
+		const table = document.getElementById('peopleTable');
+		const rows = table.getElementsByTagName('tr');
+		// 현재 체크 상태 저장
+		if (window.currentCheckDate) {
+			dateCheckState[window.currentCheckDate] = [];
+			for (let i = 0; i < rows.length; i++) {
+				const cells = rows[i].getElementsByTagName('td');
+				dateCheckState[window.currentCheckDate][i] = {
+					cleaning: cells[1].querySelector('input').checked,
+					late: cells[2].querySelector('input').checked
+				};
+			}
+		}
+		// 체크박스 초기화 또는 복원
+		if (dateCheckState[date]) {
+			for (let i = 0; i < rows.length; i++) {
+				const cells = rows[i].getElementsByTagName('td');
+				cells[1].querySelector('input').checked = dateCheckState[date][i].cleaning;
+				cells[2].querySelector('input').checked = dateCheckState[date][i].late;
+			}
+		} else {
+			for (let i = 0; i < rows.length; i++) {
+				const cells = rows[i].getElementsByTagName('td');
+				cells[1].querySelector('input').checked = false;
+				cells[2].querySelector('input').checked = false;
+			}
+		}
+		window.currentCheckDate = date;
+	});
+
+	// 체크박스 변경 시 해당 날짜의 상태를 즉시 반영
+	function updateCheckState() {
+		const date = document.getElementById('mainDate').value;
+		if (!date) return;
+		const table = document.getElementById('peopleTable');
+		const rows = table.getElementsByTagName('tr');
+		dateCheckState[date] = [];
+		for (let i = 0; i < rows.length; i++) {
+			const cells = rows[i].getElementsByTagName('td');
+			dateCheckState[date][i] = {
+				cleaning: cells[1].querySelector('input').checked,
+				late: cells[2].querySelector('input').checked
+			};
+		}
+	}
+	document.querySelectorAll('#peopleTable input[type="checkbox"]').forEach(cb => {
+		cb.addEventListener('change', updateCheckState);
+	});
+
+	function calculateFine() {
+		const table = document.getElementById('peopleTable');
+		const rows = table.getElementsByTagName('tr');
+		let result = '';
+		// 기간 표시
+		const dateStart = document.getElementById('dateStart').value;
+		const dateEnd = document.getElementById('dateEnd').value;
+		if (dateStart && dateEnd) {
+			result += `<div><b>기간:</b> ${dateStart} ~ ${dateEnd}</div>`;
+		} else {
+			result += `<div><b>기간이 올바르게 입력되지 않았습니다.</b></div>`;
+		}
+		result += '<h3 style="margin:10px 0 6px 0;">정산 목록</h3><ul style="margin:0 0 0 18px;">';
+		let anyone = false;
+		// 기간 내 날짜별로 체크된 사람 집계
+		const names = [];
+		for (let i = 0; i < rows.length; i++) {
+			names.push(rows[i].getElementsByTagName('td')[0].querySelector('input').value.trim());
+		}
+		// 날짜 반복
+		function getDateArray(start, end) {
+			const arr = [];
+			let dt = new Date(start);
+			const endDt = new Date(end);
+			while (dt <= endDt) {
+				arr.push(dt.toISOString().slice(0,10));
+				dt.setDate(dt.getDate() + 1);
+			}
+			return arr;
+		}
+		const dateArr = (dateStart && dateEnd) ? getDateArray(dateStart, dateEnd) : [];
+		const fines = Array(names.length).fill(0);
+		let found = false;
+		dateArr.forEach(date => {
+			if (dateCheckState[date]) {
+				for (let i = 0; i < names.length; i++) {
+					if (dateCheckState[date][i].cleaning) fines[i] += 5000;
+					if (dateCheckState[date][i].late) fines[i] += 1000;
+					if (dateCheckState[date][i].cleaning || dateCheckState[date][i].late) found = true;
+				}
+			}
+		});
+		for (let i = 0; i < names.length; i++) {
+			if (fines[i] > 0) {
+				result += `<li><b>${names[i]}</b>: ${fines[i].toLocaleString()}원</li>`;
+				anyone = true;
+			}
+		}
+		if (!anyone) result += '<li>벌금을 내야 하는 사람이 없습니다.</li>';
+		result += '</ul>';
+		document.getElementById('result').innerHTML = result;
+	}
+	</script>
+</body>
+</html>
+				result += `<li><b>${name}</b> (${rowDate ? rowDate + ' / ' : ''}${rowWeekday}): ${fine.toLocaleString()}원</li>`;
+				anyone = true;
+			}
+		}
+		if (!anyone) result += '<li>벌금을 내야 하는 사람이 없습니다.</li>';
+		result += '</ul>';
+		document.getElementById('result').innerHTML = result;
+	}
+	</script>
 </body>
 </html>
